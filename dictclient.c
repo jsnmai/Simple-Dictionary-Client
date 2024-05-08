@@ -169,17 +169,30 @@ int setup_socket() {
   struct addrinfo *servinfo;  // will point to the getaddrinfo results 
   char *hostname, *portno;
 
+  hostname = "www.dict.org";
+  portno = "2628";
   /* set up struct for getaddrinfo */
-
+  memset(&hints, 0, sizeof(hints)); /* checks struct is empty */
+  hints.ai_family = AF_INET;        /* use IPv4  */
+  hints.ai_socktype = SOCK_STREAM;  /* use TCP */
   /* populate servinfo with server name and port */
-
+  status = getaddrinfo(hostname, portno, &hints, &servinfo);
+  if (status) {
+    fprintf(stderr,"ERROR, no such host as %s.\n", hostname);
+    exit(1);
+  }
   /* make a socket */
-
+  sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+  if (sockfd < 0) {
+    error("ERROR creating socket.");
+  }
   /* connect! */
-
+  if (connect(sockfd, servinfo->ai_addr, servinfo->ai_addrlen) < 0) {
+    error("ERROR connecting.");
+  }
   /* freeaddrinfo and return sockfd */
-
-  return 0;
+  freeaddrinfo(servinfo);
+  return sockfd;
 }
 
 /*
@@ -193,19 +206,19 @@ void part_a() {
   char *res;
   char input[BUFSIZE], result[BUFSIZE];
   
-  memset(input, 0, BUFSIZE);
-  memset(result, 0, BUFSIZE);
-  
   /* Part A */
   printf("Enter a word: ");
 
   /* read from stdin */
-
+  res = fgets(input, BUFSIZE, stdin);
+  if (res == NULL) {
+    error("ERROR reading from stdin.");
+  }
   /* create socket, connect to server, get fd */
-
+  sockfd = setup_socket();
   /* read from socket to find synonym */
-
-  printf("Synonym: %s\n", result);
+ find_synonym(input, result, sockfd);
+ printf("Synonym: %s\n", result);
 }
 
 /*
@@ -219,16 +232,15 @@ void *thread_func_single_word (void *argsp) {
   char *word = "";
   int sockfd = 0;
   char result[BUFSIZE];
-  
-  memset(result, 0, BUFSIZE);
+  char *res;
 
   /* input word is passed in as argsp */
   word = (char *) argsp;  
 
   /* create socket, connect to server */
-
+  sockfd = setup_socket();
   /* read from socket to find synonym */
-
+  find_synonym(word, result, sockfd);
   /* copy synonym (aka result) back to word buffer to avoid memory errors */
   memset(word, 0, BUFSIZE);
   memcpy(word, result, strlen(result)); 
@@ -239,12 +251,10 @@ int main(int argc, char **argv) {
   /* Part A */
   // comment this part out after you get Part A working
   // NOTE: make sure this is commented out before submitting to autograder!
-  part_a();
-
+  // part_a();
   /* Part B */
   // uncomment when you're ready to test thread code 
-  //part_b();
+  part_b();
 
   return 0;
 }
-
